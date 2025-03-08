@@ -17,6 +17,8 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
     with SingleTickerProviderStateMixin {
   final TextEditingController weightController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
+  final TextEditingController headController = TextEditingController();
+  final TextEditingController ageController = TextEditingController();
 
   bool isLoading = false;
   bool isChecked = false;
@@ -131,6 +133,8 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
         'child_id': widget.childId,
         'height_cm': double.parse(heightController.text),
         'weight_kg': double.parse(weightController.text),
+        'head_cm': double.parse(headController.text),
+        'age_months': int.parse(ageController.text),
         // 'bmi': bmi,
         'z_score': zScore,
         'growth_status': status,
@@ -147,6 +151,8 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
 
       weightController.clear();
       heightController.clear();
+      headController.clear();
+      ageController.clear();
       isChecked = false;
       _fetchGrowthRecords();
     } catch (error) {
@@ -172,7 +178,9 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
     return Expanded(
       child: Text(text,
           style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 253, 253, 253)),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: const Color.fromARGB(255, 253, 253, 253)),
           textAlign: TextAlign.center),
     );
   }
@@ -181,7 +189,7 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
     return Expanded(
       child: Text(text,
           style: TextStyle(
-              fontSize: 15, color: Colors.black, fontWeight: FontWeight.w600),
+              fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
           textAlign: TextAlign.center),
     );
   }
@@ -236,6 +244,21 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
                           labelText: "Height (cm)",
                           prefixIcon: Icon(Icons.height)),
                     ),
+                     SizedBox(height: 10),
+                    TextField(
+                      controller: headController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                          labelText: "Head (cm)",
+                          prefixIcon: Icon(Icons.health_and_safety)),
+                    ), SizedBox(height: 10),
+                    TextField(
+                      controller: ageController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                          labelText: "Age (year)",
+                          prefixIcon: Icon(Icons.abc)),
+                    ),
                     SizedBox(height: 20),
                     isLoading
                         ? CircularProgressIndicator()
@@ -270,7 +293,7 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
                 ),
               ),
               SizedBox(height: 20),
-                Container(
+              Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color.fromARGB(255, 19, 7, 73),
@@ -279,10 +302,12 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
+                    _headerText("Head"),
                     _headerText("Weight"),
                     _headerText("Height"),
                     _headerText("BMI"),
                     _headerText("Status"),
+                    _headerText("age"),
                     _headerText("Delete"),
                   ],
                 ),
@@ -308,10 +333,12 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
+                            _dataText("${record['head_cm']} cm"),
                           _dataText("${record['weight_kg']} kg"),
                           _dataText("${record['height_cm']} cm"),
                           _dataText("${record['bmi'].toStringAsFixed(1)}"),
                           _dataText(record['growth_status']),
+                          _dataText("${record['age_months']} y"),
                           IconButton(
                             icon: Icon(Icons.delete, color: Colors.red),
                             onPressed: () => deleteRecord(record['id']),
@@ -322,12 +349,11 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
                   },
                 ),
               ),
-                   
             ],
           ),
         ),
       ),
-          floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         backgroundColor: const Color.fromARGB(255, 11, 217, 38), // Custom Color
         shape: CircleBorder(), // Rounded Button
         child: Icon(Icons.smart_toy, size: 30, color: Colors.white), // AI Icon
@@ -335,9 +361,11 @@ class _GrowthRecordPageState extends State<GrowthRecordPage>
           // ✅ Smooth Slide Animation to ChatPage
           Navigator.of(context).push(PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => ChatPage(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
               return SlideTransition(
-                position: Tween<Offset>(begin: Offset(1, 0), end: Offset(0, 0)).animate(animation),
+                position: Tween<Offset>(begin: Offset(1, 0), end: Offset(0, 0))
+                    .animate(animation),
                 child: child,
               );
             },

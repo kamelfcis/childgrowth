@@ -8,7 +8,7 @@ double calculateZScore(double measuredValue, double mean, double stdDev) {
 
 String checkGrowthStatus(double weight, double height, double meanWeight, double stdWeight) {
   double zScore = calculateZScore(weight, meanWeight, stdWeight);
-  if (zScore < -2) return "🚨 Growth Alert: Underweight";
-  if (zScore > 2) return "🚨 Growth Alert: Overweight";
-  return "✅ Growth is normal";
+  if (zScore < -2) return "🚨Underweight";
+  if (zScore > 2) return "🚨Overweight";
+  return "✅Normal";
 }

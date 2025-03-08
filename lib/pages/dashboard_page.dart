@@ -9,9 +9,96 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   bool isLoading = true;
+  List<Map<String, dynamic>> childrenList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchChildren();
+  }
+
+  Future<void> _fetchChildren() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    final response = await Supabase.instance.client
+        .from('children')
+        .select()
+        .eq('parent_id', user.id)
+        .order('dob', ascending: true);
+
+    setState(() {
+      childrenList = List<Map<String, dynamic>>.from(response);
+      isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Icon(Icons.bar_chart, color: Colors.white),
+            SizedBox(width: 10),
+            Text(
+              "Growth Statistics",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        backgroundColor: const Color.fromARGB(255, 26, 2, 67),
+        foregroundColor: Colors.white,
+      ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : childrenList.isEmpty
+              ? Center(child: Text("No children found. Add a child first!"))
+              : DefaultTabController(
+                  length: childrenList.length,
+                  child: Column(
+                    children: [
+                      Container(
+                        color: const Color.fromARGB(255, 169, 139, 226),
+                        child: TabBar(
+                          isScrollable: true,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: const Color.fromARGB(255, 37, 5, 92),
+                          indicatorColor: Colors.white,
+                          tabs: childrenList.map((child) {
+                            return Tab(text: child['full_name']);
+                          }).toList(),
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: childrenList.map((child) {
+                            return ChildStatisticsTab(childId: child['id']);
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+    );
+  }
+}
+
+class ChildStatisticsTab extends StatefulWidget {
+  final String childId;
+  ChildStatisticsTab({required this.childId});
+
+  @override
+  _ChildStatisticsTabState createState() => _ChildStatisticsTabState();
+}
+
+class _ChildStatisticsTabState extends State<ChildStatisticsTab> {
+  bool isLoading = true;
   int recordCount = 0;
   List<double> bmiValues = [];
   List<double> weightValues = [];
+  List<double> heightValues = [];
+  List<double> headCircumferenceValues = [];
   List<String> dates = [];
 
   @override
@@ -20,193 +107,130 @@ class _DashboardPageState extends State<DashboardPage> {
     _fetchGrowthRecords();
   }
 
- Future<void> _fetchGrowthRecords() async {
-  print("Fetching records from Supabase...");
-  try {
-    final response = await Supabase.instance.client
-        .from('growth_records')
-        .select()
-        .order('recorded_at', ascending: true);
+  Future<void> _fetchGrowthRecords() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('growth_records')
+          .select()
+          .eq('child_id', widget.childId)
+          .order('recorded_at', ascending: true);
 
-    print("Response from Supabase: $response"); // 🔴 Debugging output
+      if (response.isEmpty) {
+        setState(() => isLoading = false);
+        return;
+      }
 
-    if (response == null || response.isEmpty) {
-      print("No records found.");
       setState(() {
+        recordCount = response.length;
+        bmiValues = response.map<double>((r) => (r['bmi'] as num?)?.toDouble() ?? 0.0).toList();
+        weightValues = response.map<double>((r) => (r['weight_kg'] as num?)?.toDouble() ?? 0.0).toList();
+        heightValues = response.map<double>((r) => (r['height_cm'] as num?)?.toDouble() ?? 0.0).toList();
+        headCircumferenceValues = response.map<double>((r) => (r['head_cm'] as num?)?.toDouble() ?? 0.0).toList();
+        dates = response.map<String>((r) => (r['recorded_at'] ?? "").toString().split('T')[0]).toList();
         isLoading = false;
       });
-      return;
+    } catch (error) {
+      print("Error fetching records: $error");
+      setState(() => isLoading = false);
     }
-
-    setState(() {
-      recordCount = response.length;
-      bmiValues = response.map<double>((r) => (r['bmi'] as num?)?.toDouble() ?? 0.0).toList();
-      weightValues = response.map<double>((r) => (r['weight_kg'] as num?)?.toDouble() ?? 0.0).toList();
-      dates = response.map<String>((r) => (r['recorded_at'] ?? "").toString().split('T')[0]).toList();
-      isLoading = false;
-    });
-
-  } catch (error) {
-    print("Error fetching records: $error"); // 🔴 Debugging error
-    setState(() => isLoading = false);
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(Icons.dashboard, color: Colors.white),
-            SizedBox(width: 10),
-            Text(
-              "Dashboard",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        backgroundColor: const Color.fromARGB(255, 19, 7, 73),
-        foregroundColor: Colors.white,
-      ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  // Total Records Counter
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 19, 7, 73),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
-                    ),
-                    child: Text(
-                      "📊 Total Growth Records: $recordCount",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+    return isLoading
+        ? Center(child: CircularProgressIndicator())
+        : Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 3, 94, 50),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
                   ),
-                  SizedBox(height: 20),
+                  child: Text(
+                    "📊 Who Growth Charts: $recordCount",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(height: 20),
 
-                  // BMI Trend Line Chart
-                  if (bmiValues.isNotEmpty)
-                    Container(
-                      height: 250,
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            "📈 BMI Over Time",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 10),
-                          Expanded(child: _buildLineChart()),
-                        ],
-                      ),
-                    ),
-
-                  SizedBox(height: 20),
-
-                  // Weight Distribution Bar Chart
-                  if (weightValues.isNotEmpty)
-                    Container(
-                      height: 250,
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            "🏋️ Weight Distribution",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 10),
-                          Expanded(child: _buildBarChart()),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildChart("📈 BMI Over Time", bmiValues, Colors.blue, "BMI"),
+                      _buildChart("📏 Height Over Time", heightValues, Colors.orange, "Height (cm)"),
+                      _buildChart("🏋️ Weight Over Time", weightValues, Colors.green, "Weight (kg)"),
+                      _buildChart("👶 Head Circumference", headCircumferenceValues, Colors.red, "Head (cm)"),
+                    ],
+                  ),
+                ),
+              ],
             ),
-    );
+          );
   }
 
-  /// ✅ **Fixed: Correctly Wrap LineChartData inside LineChart Widget**
- Widget _buildLineChart() {
-  return LineChart(
-    LineChartData(
-      gridData: FlGridData(show: true),
-      titlesData: FlTitlesData(
-        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            getTitlesWidget: (double value, TitleMeta meta) {
-              int index = value.toInt();
-              if (index >= 0 && index < dates.length) {
-                return Text(dates[index], style: TextStyle(fontSize: 10));
-              }
-              return Text('');
-            },
-          ),
-        ),
-      ),
-      borderData: FlBorderData(show: true),
-      lineBarsData: [
-        LineChartBarData(
-          spots: List.generate(
-            bmiValues.length,
-            (index) => FlSpot(index.toDouble(), bmiValues[index]),
-          ),
-          isCurved: true,
-          barWidth: 3,
-          color: Colors.blueAccent,
-          dotData: FlDotData(show: true),
-        ),
-      ],
-    ),
-  );
-}
-
-
-  /// ✅ **Fixed: Correctly Wrap BarChartData inside BarChart Widget**
-  Widget _buildBarChart() {
-  return BarChart(
-    BarChartData(
-      alignment: BarChartAlignment.spaceAround,
-      maxY: weightValues.isNotEmpty ? weightValues.reduce((a, b) => a > b ? a : b) + 5 : 10,
-      barGroups: List.generate(
-        weightValues.length,
-        (index) => BarChartGroupData(
-          x: index,
-          barRods: [
-            BarChartRodData(
-              toY: weightValues[index],
-              color: Colors.greenAccent,
-              width: 16,
+  /// 📊 **Reusable Method to Build Charts**
+  Widget _buildChart(String title, List<double> values, Color color, String label) {
+    return values.isEmpty
+        ? Center(child: Text("No records available for $label", style: TextStyle(fontSize: 16, color: Colors.grey)))
+        : Container(
+            height: 250,
+            margin: EdgeInsets.symmetric(vertical: 10),
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
             ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
+            child: Column(
+              children: [
+                Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(height: 10),
+                Expanded(
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: true),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: true, reservedSize: 35),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 22,
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              int index = value.toInt();
+                              if (index >= 0 && index < dates.length) {
+                                return Text(dates[index], style: TextStyle(fontSize: 10));
+                              }
+                              return Text('');
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: true),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: List.generate(
+                            values.length,
+                            (index) => FlSpot(index.toDouble(), values[index]),
+                          ),
+                          isCurved: true,
+                          barWidth: 3,
+                          color: color,
+                          dotData: FlDotData(show: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+  }
 }
